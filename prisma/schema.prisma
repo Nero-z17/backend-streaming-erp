@@ -1,0 +1,92 @@
+// 1. Configuration de Prisma et de la Base de Données
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ---------------------------------------------------------
+// 2. LES MODÈLES (Tes tables avec tes noms exacts)
+// ---------------------------------------------------------
+
+model Admin {
+  id_admin            String          @id @default(uuid())
+  username_admin      String          @unique
+  password_hash_admin String
+  // Relations
+  clients             Clients[]
+  accounts            Accounts[]
+  expenses            Expenses[]
+}
+
+model Clients {
+  id_clt              String          @id @default(uuid())
+  name_clt            String
+  whatsapp_number_clt String          // Ex: "+2376XXXXXXXX"
+  note_clt            String?         // Le "?" signifie optionnel
+  created_date_clt    DateTime        @default(now())
+  
+  // Relation Prisma (invisible dans la DB, utile pour le code JS)
+  id_admin            String
+  admin               Admin           @relation(fields: [id_admin], references: [id_admin])
+  Subscriptions       Subscriptions[]
+}
+
+model Accounts {
+  id_acct             String          @id @default(uuid())
+  platform_acct       String          // 'NETFLIX', 'PRIME', 'CRUNCHYROLL'
+  email_acct          String
+  password_acct       String          // Mot de passe en clair
+  purchase_price_acct Int
+  renewal_date_acct   DateTime
+  status_acct         String          @default("ACTIVE") // 'ACTIVE', 'EXPIRED'
+  
+  // Relation
+  id_admin            String
+  admin               Admin           @relation(fields: [id_admin], references: [id_admin])
+  Profiles            Profiles[]
+}
+
+model Profiles {
+  id_profil           String          @id @default(uuid())
+  id_acct             String          // Clé étrangère vers Accounts
+  name_profil         String          // Ex: "Profil 1"
+  pin_code_profil     String?
+  
+  // Relations
+  account             Accounts        @relation(fields: [id_acct], references: [id_acct], onDelete: Cascade)
+  Subscriptions       Subscriptions[]
+}
+
+model Subscriptions {
+  id_subs              String         @id @default(uuid())
+  id_clt               String         // Clé étrangère vers Clients
+  id_profil            String         // Clé étrangère vers Profiles
+  
+  duration_months_subs Int
+  agreed_price_subs    Int
+  amount_paid_subs     Int
+  payment_status_subs  String         // 'PAID', 'PENDING', 'PARTIAL'
+  start_date_subs      DateTime       @default(now())
+  end_date_subs        DateTime
+  status_subs          String         @default("ACTIVE") // 'ACTIVE', 'EXPIRED', 'SUSPENDED'
+  
+  // Relations
+  client               Clients        @relation(fields: [id_clt], references: [id_clt], onDelete: Cascade)
+  profile              Profiles       @relation(fields: [id_profil], references: [id_profil], onDelete: Cascade)
+}
+
+model Expenses {
+  id_exp              String          @id @default(uuid())
+  date_exp            DateTime        @default(now())
+  category_exp        String          // 'FACEBOOK_ADS', 'MOBILE_MONEY_FEES', 'GRAPHIC_DESIGN', 'OTHER'
+  amount_exp          Int
+  description_exp     String?
+
+  id_admin            String
+  admin               Admin           @relation(fields: [id_admin], references: [id_admin])
+}
+
+

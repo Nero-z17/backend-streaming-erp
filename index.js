@@ -1,5 +1,22 @@
 import express from 'express';
 import cors from 'cors';
+
+import pg from 'pg';
+import { PrismaPg } from '@prisma/adapter-pg';
+import { PrismaClient } from '@prisma/client';
+
+// 1. Configuration du pool de connexion PostgreSQL avec l'URL du Cloud
+const pool = new pg.Pool({ 
+  connectionString: process.env.DATABASE_URL 
+});
+
+// 2. Création de l'adaptateur de pilote pour PostgreSQL
+const adapter = new PrismaPg(pool);
+
+// 3. Injection sécurisée de l'adaptateur dans le client Prisma
+const prisma = new PrismaClient({ adapter });
+
+
 import authRoutes from './routes/auth.js';
 import { verifyToken } from './middleware/auth.js'; // Le garde du corps
 

@@ -42,10 +42,25 @@ router.get('/monthly', async (req, res) => {
     const monthlyData = {};
 
     subs.forEach(sub => {
-      const date = new Date(sub.start_date_subs);
-      const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-      if (!monthlyData[monthKey]) monthlyData[monthKey] = { name: monthKey, revenue: 0, expenses: 0, profit: 0 };
-      monthlyData[monthKey].revenue += sub.amount_paid_subs;
+      const startDate = new Date(sub.start_date_subs);
+      // Sécurité : On récupère la durée, si elle est absente ou à 0, on met 1 mois par défaut
+      const duration = sub.duration_months_subs && sub.duration_months_subs > 0 ? sub.duration_months_subs : 1; 
+      
+      // On divise le montant par le nombre de mois (arrondi pour éviter les décimales moches en FCFA)
+      const monthlyRevenue = Math.round(sub.amount_paid_subs / duration);
+
+      // On boucle pour étaler l'argent sur chaque mois couvert par l'abonnement
+      for (let i = 0; i < duration; i++) {
+        // Magie de JS : si le mois dépasse 11 (Décembre), ça passe automatiquement à l'année suivante
+        const targetMonth = new Date(startDate.getFullYear(), startDate.getMonth() + i, 1);
+        const monthKey = `${targetMonth.getFullYear()}-${String(targetMonth.getMonth() + 1).padStart(2, '0')}`;
+        
+        if (!monthlyData[monthKey]) {
+          monthlyData[monthKey] = { name: monthKey, revenue: 0, expenses: 0, profit: 0 };
+        }
+        // On ajoute uniquement la part de ce mois !
+        monthlyData[monthKey].revenue += monthlyRevenue;
+      }
     });
 
     expenses.forEach(exp => {

@@ -70,12 +70,20 @@ router.post('/:id/profiles', async (req, res) => {
 
 router.get('/:id/profiles', async (req, res) => {
   try {
-    const profiles = await prisma.profiles.findMany({ where: { id_acct: req.params.id } });
+    const profiles = await prisma.profiles.findMany({ 
+      where: { id_acct: req.params.id },
+      include: {
+        _count: {
+          select: { Subscriptions: true }
+        }
+      }
+    });
     res.json(profiles);
   } catch (error) {
     res.status(500).json({ error: "Erreur récupération profils" });
   }
 });
+
 
 router.put('/profiles/:idProfil', async (req, res) => {
   try {

@@ -60,7 +60,7 @@ app.get('/api/alertes-telegram', async (req, res) => {
     debutAujourdhui.setHours(0, 0, 0, 0);
 
     const dateLimite = new Date();
-    dateLimite.setDate(dateLimite.getDate() + 2);
+    dateLimite.setDate(dateLimite.getDate() + 7);
     const finJourneeLimite = new Date(dateLimite.setHours(23, 59, 59, 999));
 
     const expirations = await prisma.subscriptions.findMany({
@@ -79,11 +79,11 @@ app.get('/api/alertes-telegram', async (req, res) => {
     });
 
     if (expirations.length === 0) {
-      return res.json({ message: "Aucun abonnement ne se termine dans moins de 2 jours." });
+      return res.json({ message: "Aucun abonnement ne se termine dans moins de 7 jours." });
     }
 
     // Changement du nom de l'application ici
-    let texteTelegram = `🔥 *Nero-Erp - Alerte Expirations (< 2 jours)* 🔥\n\n`;
+    let texteTelegram = `🔥 *Nero-Erp - Alerte Expirations (< 7 jours)* 🔥\n\n`;
     texteTelegram += `Salut Nero, voici les abonnements à relancer :\n\n`;
     
     expirations.forEach((sub, index) => {

@@ -42,6 +42,8 @@ model Accounts {
   purchase_price_acct Int
   renewal_date_acct   DateTime
   status_acct         String          @default("ACTIVE") // 'ACTIVE', 'EXPIRED'
+  visa_card           String?
+  gmail_password      String?
   
   // Relation
   id_admin            String

@@ -18,13 +18,15 @@ router.get('/', async (req, res) => {
 
 router.post('/', async (req, res) => {
   try {
-    const { platform_acct, email_acct, password_acct, purchase_price_acct, renewal_date_acct, status_acct } = req.body;
+    const { platform_acct, email_acct, password_acct, purchase_price_acct, renewal_date_acct, status_acct, mdp_gmail_acct, visa_acct } = req.body;
     const newAccount = await prisma.accounts.create({
       data: {
         platform_acct, email_acct, password_acct,
         purchase_price_acct: parseFloat(purchase_price_acct),
         renewal_date_acct: new Date(renewal_date_acct),
         status_acct: status_acct || 'ACTIVE',
+        mdp_gmail_acct: mdp_gmail_acct || null, 
+        visa_acct: visa_acct || null,           
         id_admin: req.admin.id // Tampon de l'admin
       }
     });
@@ -36,10 +38,10 @@ router.post('/', async (req, res) => {
 
 router.put('/:id', async (req, res) => {
   try {
-    const { platform_acct, email_acct, password_acct, purchase_price_acct, renewal_date_acct } = req.body;
+    const { platform_acct, email_acct, password_acct, purchase_price_acct, renewal_date_acct, mdp_gmail_acct, visa_acct } = req.body;
     const updatedAccount = await prisma.accounts.update({
       where: { id_acct: req.params.id },
-      data: { platform_acct, email_acct, password_acct, purchase_price_acct: parseFloat(purchase_price_acct), renewal_date_acct: new Date(renewal_date_acct) }
+      data: { platform_acct, email_acct, password_acct, purchase_price_acct: parseFloat(purchase_price_acct), renewal_date_acct: new Date(renewal_date_acct), mdp_gmail_acct: mdp_gmail_acct || null, visa_acct: visa_acct || null}
     });
     res.json(updatedAccount);
   } catch (error) {

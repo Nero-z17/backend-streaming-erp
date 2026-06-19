@@ -96,7 +96,9 @@ app.get('/api/alertes-telegram', async (req, res) => {
       
       // Nettoyage du numéro (garde uniquement les chiffres) pour le lien WhatsApp
       const cleanNumber = sub.client.whatsapp_number_clt.replace(/\D/g, '');
-      const lienWhatsApp = `https://wa.me/${cleanNumber}`;
+      const messageWhatsApp = `Bonjour ${nomClient} 👋,\n\nNous vous informons que votre abonnement ${nomPlateforme} arrive à expiration le *${dateFin}*.\n\nAfin de continuer à profiter de nos services de streaming, nous vous invitons à procéder à son renouvellement dans les plus brefs délais.\n\nCordialement.`;
+      const messageEncode = encodeURIComponent(messageWhatsApp);
+      const lienWhatsApp = `https://wa.me/${cleanNumber}?text=${messageEncode}`;
 
       // Construction du bloc d'information complet
       texteTelegram += `${index + 1}️⃣ *${nomClient}*\n`;
@@ -104,7 +106,7 @@ app.get('/api/alertes-telegram', async (req, res) => {
       texteTelegram += `📧 Email : ${emailCompte}\n`;
       texteTelegram += `👤 Profil : ${nomProfil}\n`;
       texteTelegram += `📅 Expiration : ${dateFin}\n`;
-      texteTelegram += `💬 Relancer : ${lienWhatsApp}\n\n`;
+      texteTelegram += `💬 Relancer : [Cliquer ici pour envoyer le message](${lienWhatsApp})\n\n`;
     });
 
     texteTelegram += `⚡ _Ouvre ton Nero-Erp pour la gestion complète._`;

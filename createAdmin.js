@@ -14,8 +14,8 @@ async function createAdmin() {
     console.log("⏳ Création de l'administrateur en cours...");
 
     // 1. Définis ici tes identifiants de connexion
-    const username = "Nero"; 
-    const plainPassword = "Neronero"; // Remplace par le mot de passe que tu veux taper sur ton tel
+    const username = "Nepo"; 
+    const plainPassword = "Neponepo"; // Remplace par le mot de passe que tu veux taper sur ton tel
 
     // 2. Cryptage du mot de passe
     const hashedPassword = await bcrypt.hash(plainPassword, 10);

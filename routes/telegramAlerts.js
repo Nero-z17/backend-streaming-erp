@@ -1,5 +1,10 @@
 import express from 'express';
 import prisma from '../db.js';
+import cors from 'cors';
+
+import pg from 'pg';
+import { PrismaPg } from '@prisma/adapter-pg';
+import { PrismaClient } from '@prisma/client';
 
 const router = express.Router();
 

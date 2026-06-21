@@ -2,25 +2,21 @@ import pg from 'pg';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
-import 'dotenv/config'; // Pour lire l'URL Neon depuis ton .env
+import 'dotenv/config';
 
-// Connexion à Neon (Exactement comme dans ton db.js)
 const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
 const adapter = new PrismaPg(pool);
 const prisma = new PrismaClient({ adapter });
 
 async function createAdmin() {
   try {
-    console.log("⏳ Création de l'administrateur en cours...");
-
-    // 1. Définis ici tes identifiants de connexion
     const username = "Nepo"; 
-    const plainPassword = "Neponepo"; // Remplace par le mot de passe que tu veux taper sur ton tel
+    const plainPassword = "Neponepo"; 
 
-    // 2. Cryptage du mot de passe
-    const hashedPassword = await bcrypt.hash(plainPassword, 10);
+    // Conversion forcée en string pour éviter l'erreur "must be a string"
+    const passwordString = String(plainPassword); 
+    const hashedPassword = await bcrypt.hash(passwordString, 10);
 
-    // 3. Injection dans la base de données Cloud
     const newAdmin = await prisma.admin.create({
       data: {
         username_admin: username,
@@ -28,13 +24,11 @@ async function createAdmin() {
       },
     });
 
-    console.log(`✅ Succès ! L'admin "${newAdmin.username_admin}" est maintenant dans ta base Neon.`);
-    console.log("📱 Tu peux maintenant te connecter depuis ton téléphone !");
-
+    console.log("✅ Admin créé avec succès :", newAdmin.username_admin);
+    process.exit(0);
   } catch (error) {
-    console.error("❌ Erreur :", error);
-  } finally {
-    await prisma.$disconnect();
+    console.error("❌ Erreur critique :", error);
+    process.exit(1);
   }
 }
 

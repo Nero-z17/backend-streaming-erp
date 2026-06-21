@@ -8,7 +8,7 @@ import { PrismaClient } from '@prisma/client';
 
 const router = express.Router();
 
-app.get('/subscriptions', async (req, res) => {
+router.get('/subscriptions', async (req, res) => {
   const { secret } = req.query;
   
   if (!secret || secret !== process.env.CRON_SECRET) {

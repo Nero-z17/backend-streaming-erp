@@ -97,25 +97,33 @@ router.get('/subscriptions', async (req, res) => {
 
 router.get('/accounts', async (req, res) => {
   const { secret } = req.query;
-  
   if (!secret || secret !== process.env.CRON_SECRET) {
-    return res.status(401).json({ erreur: "Accès refusé : secret manquant ou incorrect." });
+    return res.status(401).json({ erreur: "Accès refusé." });
   }
 
   try {
-    const debutAujourdhui = new Date();
-    debutAujourdhui.setHours(0, 0, 0, 0);
-
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
     const dateLimite = new Date();
     dateLimite.setDate(dateLimite.getDate() + 7);
-    const finJourneeLimite = new Date(dateLimite.setHours(23, 59, 59, 999));
+    
+    // 1. On récupère TOUS les comptes sans filtre de date SQL
+    const tousLesComptes = await prisma.accounts.findMany();
 
-    const comptesARenouveler = await prisma.accounts.findMany({
-      where: { renewal_date_acct: { gte: debutAujourdhui, lte: finJourneeLimite } }
+    // 2. On filtre intelligemment en Javascript avec notre nouvelle logique
+    const comptesARenouveler = tousLesComptes.filter(acc => {
+      const start = new Date(acc.start_date_acct);
+      let nextRenewal = new Date(today.getFullYear(), today.getMonth(), start.getDate());
+      
+      if (nextRenewal < today) {
+        nextRenewal.setMonth(nextRenewal.getMonth() + 1);
+      }
+      // On garde si le prochain renouvellement est entre aujourd'hui et dans 7 jours
+      return nextRenewal >= today && nextRenewal <= dateLimite;
     });
 
     if (comptesARenouveler.length === 0) {
-      return res.json({ message: "Aucun compte fournisseur à renouveler dans les 7 prochains jours." });
+      return res.json({ message: "Aucun compte fournisseur à renouveler." });
     }
 
     let texteTelegram = `⚠️ *Nero-Erp - Renouvellement Comptes (< 7 jours)* ⚠️\n\n`;

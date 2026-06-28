@@ -6,9 +6,10 @@ const router = express.Router();
 router.get('/', async (req, res) => {
   try {
     const accounts = await prisma.accounts.findMany({
-      where: { id_admin: req.admin.id }, // Filtrage par admin
+      where: { id_admin: req.admin.id }, 
       include: { Profiles: true },
-      orderBy: { renewal_date_acct: 'asc' }
+      // On trie désormais par la date de début de création
+      orderBy: { start_date_acct: 'asc' } 
     });
     res.json(accounts);
   } catch (error) {
@@ -18,16 +19,16 @@ router.get('/', async (req, res) => {
 
 router.post('/', async (req, res) => {
   try {
-    const { platform_acct, email_acct, password_acct, purchase_price_acct, renewal_date_acct, status_acct, mdp_gmail_acct, visa_acct } = req.body;
+    const { platform_acct, email_acct, password_acct, purchase_price_acct, start_date_acct, status_acct, mdp_gmail_acct, visa_acct } = req.body;
     const newAccount = await prisma.accounts.create({
       data: {
         platform_acct, email_acct, password_acct,
         purchase_price_acct: parseFloat(purchase_price_acct),
-        renewal_date_acct: new Date(renewal_date_acct),
+        start_date_acct: new Date(start_date_acct), // MODIFIÉ ICI
         status_acct: status_acct || 'ACTIVE',
         mdp_gmail_acct: mdp_gmail_acct || null, 
         visa_acct: visa_acct || null,           
-        id_admin: req.admin.id // Tampon de l'admin
+        id_admin: req.admin.id 
       }
     });
     res.status(201).json(newAccount);
@@ -38,10 +39,18 @@ router.post('/', async (req, res) => {
 
 router.put('/:id', async (req, res) => {
   try {
-    const { platform_acct, email_acct, password_acct, purchase_price_acct, renewal_date_acct, mdp_gmail_acct, visa_acct } = req.body;
+    const { platform_acct, email_acct, password_acct, purchase_price_acct, start_date_acct, mdp_gmail_acct, visa_acct } = req.body;
     const updatedAccount = await prisma.accounts.update({
       where: { id_acct: req.params.id },
-      data: { platform_acct, email_acct, password_acct, purchase_price_acct: parseFloat(purchase_price_acct), renewal_date_acct: new Date(renewal_date_acct), mdp_gmail_acct: mdp_gmail_acct || null, visa_acct: visa_acct || null}
+      data: { 
+        platform_acct, 
+        email_acct, 
+        password_acct, 
+        purchase_price_acct: parseFloat(purchase_price_acct), 
+        start_date_acct: new Date(start_date_acct), // MODIFIÉ ICI
+        mdp_gmail_acct: mdp_gmail_acct || null, 
+        visa_acct: visa_acct || null
+      }
     });
     res.json(updatedAccount);
   } catch (error) {
@@ -85,7 +94,6 @@ router.get('/:id/profiles', async (req, res) => {
     res.status(500).json({ error: "Erreur récupération profils" });
   }
 });
-
 
 router.put('/profiles/:idProfil', async (req, res) => {
   try {

@@ -107,19 +107,23 @@ router.get('/accounts', async (req, res) => {
     const dateLimite = new Date();
     dateLimite.setDate(dateLimite.getDate() + 7);
     
-    // 1. On récupère TOUS les comptes sans filtre de date SQL
+    // 1. On récupère TOUS les comptes
     const tousLesComptes = await prisma.accounts.findMany();
 
-    // 2. On filtre intelligemment en Javascript avec notre nouvelle logique
-    const comptesARenouveler = tousLesComptes.filter(acc => {
+    // 2. NOUVEAU : On attache la VRAIE date de renouvellement dynamique à chaque compte
+    const comptesAvecRenouvellement = tousLesComptes.map(acc => {
       const start = new Date(acc.start_date_acct);
       let nextRenewal = new Date(today.getFullYear(), today.getMonth(), start.getDate());
       
       if (nextRenewal < today) {
         nextRenewal.setMonth(nextRenewal.getMonth() + 1);
       }
-      // On garde si le prochain renouvellement est entre aujourd'hui et dans 7 jours
-      return nextRenewal >= today && nextRenewal <= dateLimite;
+      return { ...acc, dynamicNextRenewal: nextRenewal };
+    });
+
+    // 3. On filtre en utilisant cette nouvelle date
+    const comptesARenouveler = comptesAvecRenouvellement.filter(acc => {
+      return acc.dynamicNextRenewal >= today && acc.dynamicNextRenewal <= dateLimite;
     });
 
     if (comptesARenouveler.length === 0) {
@@ -132,14 +136,14 @@ router.get('/accounts', async (req, res) => {
     comptesARenouveler.forEach((acc, index) => {
       const plateforme = acc.platform_acct;
       const email = acc.email_acct;
-      // Affichage propre de la carte Visa
       const visa = acc.visa_acct ? acc.visa_acct : "Non renseignée";
       const prix = acc.purchase_price_acct;
-      const dateFin = new Date(acc.renewal_date_acct).toLocaleDateString('fr-FR');
+      
+      // 4. CORRECTION : On affiche la date dynamique pour le mois en cours !
+      const dateFin = acc.dynamicNextRenewal.toLocaleDateString('fr-FR');
       
       texteTelegram += `${index + 1}️⃣ *${plateforme}*\n`;
       texteTelegram += `📧 Email : ${email}\n`;
-      // L'utilisation des accents graves (\`) permet de copier la carte en un clic sur Telegram !
       texteTelegram += `💳 Carte Visa : \`${visa}\`\n`;
       texteTelegram += `💰 Prix à payer : ${prix} FCFA\n`;
       texteTelegram += `📅 Renouvellement : *${dateFin}*\n\n`;

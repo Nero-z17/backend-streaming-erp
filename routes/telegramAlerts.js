@@ -23,6 +23,7 @@ router.get('/subscriptions', async (req, res) => {
     dateLimite.setDate(dateLimite.getDate() + 7);
     const finJourneeLimite = new Date(dateLimite.setHours(23, 59, 59, 999));
 
+    // 1. Récupération des abonnements à relancer (< 7 jours)
     const expirations = await prisma.subscriptions.findMany({
       where: {
         end_date_subs: {
@@ -30,44 +31,66 @@ router.get('/subscriptions', async (req, res) => {
           lte: finJourneeLimite
         }
       },
-      include: {
-        client: true, 
-        profile: {    
-          include: { account: true }
-        }
-      }
+      include: { client: true, profile: { include: { account: true } } }
     });
 
-    if (expirations.length === 0) {
-      return res.json({ message: "Aucun abonnement ne se termine dans moins de 7 jours." });
+    // 2. NOUVEAU : Récupération des abonnements non renouvelés (Déjà terminés)
+    const nonRenouveles = await prisma.subscriptions.findMany({
+      where: {
+        end_date_subs: {
+          lt: debutAujourdhui
+        },
+        status_subs: "ACTIVE" // Évite de récupérer les vieux abonnements déjà passés en EXPIRED
+      },
+      include: { client: true, profile: { include: { account: true } } }
+    });
+
+    if (expirations.length === 0 && nonRenouveles.length === 0) {
+      return res.json({ message: "Aucun abonnement à signaler." });
     }
 
-    // Changement du nom de l'application ici
-    let texteTelegram = `🔥 *Nero-Erp - Alerte Expirations (< 7 jours)* 🔥\n\n`;
-    texteTelegram += `Salut Nero, voici les abonnements à relancer :\n\n`;
+    let texteTelegram = `🔥 *Nero-Erp - Alerte Abonnements* 🔥\n\n`;
     
-    expirations.forEach((sub, index) => {
-      // Extraction des nouvelles données depuis ton schéma Prisma
-      const nomClient = sub.client.name_clt;
-      const nomPlateforme = sub.profile.account.platform_acct;
-      const emailCompte = sub.profile.account.email_acct;
-      const nomProfil = sub.profile.name_profil;
-      const dateFin = new Date(sub.end_date_subs).toLocaleDateString('fr-FR');
-      
-      // Nettoyage du numéro (garde uniquement les chiffres) pour le lien WhatsApp
-      const cleanNumber = sub.client.whatsapp_number_clt.replace(/\D/g, '');
-      const messageWhatsApp = `Bonjour ${nomClient} 👋,\n\nNous vous informons que votre abonnement ${nomPlateforme} arrive à expiration le *${dateFin}*.\n\nAfin de continuer à profiter de nos services de streaming, nous vous invitons à procéder à son renouvellement dans les plus brefs délais.\n\nCordialement.`;
-      const messageEncode = encodeURIComponent(messageWhatsApp);
-      const lienWhatsApp = `https://wa.me/${cleanNumber}?text=${messageEncode}`;
+    // -- BLOC 1 : Expirations proches --
+    if (expirations.length > 0) {
+      texteTelegram += `⏳ *Abonnements à relancer (< 7 jours) :*\n\n`;
+      expirations.forEach((sub, index) => {
+        const nomClient = sub.client.name_clt;
+        const nomPlateforme = sub.profile.account.platform_acct;
+        const emailCompte = sub.profile.account.email_acct;
+        const nomProfil = sub.profile.name_profil;
+        const dateFin = new Date(sub.end_date_subs).toLocaleDateString('fr-FR');
+        
+        const cleanNumber = sub.client.whatsapp_number_clt.replace(/\D/g, '');
+        const messageWhatsApp = `Bonjour ${nomClient} 👋,\n\nNous vous informons que votre abonnement ${nomPlateforme} arrive à expiration le *${dateFin}*.\n\nAfin de continuer à profiter de nos services de streaming, nous vous invitons à procéder à son renouvellement dans les plus brefs délais.\n\nCordialement.`;
+        const lienWhatsApp = `https://wa.me/${cleanNumber}?text=${encodeURIComponent(messageWhatsApp)}`;
 
-      // Construction du bloc d'information complet
-      texteTelegram += `${index + 1}️⃣ *${nomClient}*\n`;
-      texteTelegram += `📺 Plateforme : _${nomPlateforme}_\n`;
-      texteTelegram += `📧 Email : ${emailCompte}\n`;
-      texteTelegram += `👤 Profil : ${nomProfil}\n`;
-      texteTelegram += `📅 Expiration : ${dateFin}\n`;
-      texteTelegram += `💬 Relancer : [Cliquer ici pour envoyer le message](${lienWhatsApp})\n\n`;
-    });
+        texteTelegram += `${index + 1}️⃣ *${nomClient}*\n`;
+        texteTelegram += `📺 Plateforme : _${nomPlateforme}_\n`;
+        texteTelegram += `📧 Email : ${emailCompte}\n`;
+        texteTelegram += `👤 Profil : ${nomProfil}\n`;
+        texteTelegram += `📅 Expiration : ${dateFin}\n`;
+        texteTelegram += `💬 Relancer : [Message WhatsApp](${lienWhatsApp})\n\n`;
+      });
+    }
+
+    // -- BLOC 2 : Non renouvelés --
+    if (nonRenouveles.length > 0) {
+      texteTelegram += `❌ *NON RENOUVELÉS (Terminés) :*\n\n`;
+      nonRenouveles.forEach((sub, index) => {
+        const nomClient = sub.client.name_clt;
+        const nomPlateforme = sub.profile.account.platform_acct;
+        const emailCompte = sub.profile.account.email_acct;
+        const nomProfil = sub.profile.name_profil;
+        const dateFin = new Date(sub.end_date_subs).toLocaleDateString('fr-FR');
+
+        texteTelegram += `🔴 *${nomClient}*\n`;
+        texteTelegram += `📺 Plateforme : _${nomPlateforme}_\n`;
+        texteTelegram += `📧 Email : ${emailCompte}\n`;
+        texteTelegram += `👤 Profil : ${nomProfil}\n`;
+        texteTelegram += `📅 Expiré depuis le : *${dateFin}*\n\n`;
+      });
+    }
 
     texteTelegram += `⚡ _Ouvre ton Nero-Erp pour la gestion complète._`;
 
@@ -82,11 +105,11 @@ router.get('/subscriptions', async (req, res) => {
         chat_id: chatId,
         text: texteTelegram,
         parse_mode: 'Markdown',
-        disable_web_page_preview: true // Option très utile : empêche Telegram d'afficher un énorme aperçu du lien WhatsApp sous chaque message
+        disable_web_page_preview: true
       })
     });
 
-    return res.json({ success: true, message: `Alerte envoyée pour ${expirations.length} client(s) !` });
+    return res.json({ success: true, message: `Alerte envoyée (À relancer: ${expirations.length}, Expirés: ${nonRenouveles.length}) !` });
 
   } catch (error) {
     console.error("Erreur lors de l'envoi Telegram :", error);

@@ -23,25 +23,13 @@ router.get('/subscriptions', async (req, res) => {
     dateLimite.setDate(dateLimite.getDate() + 7);
     const finJourneeLimite = new Date(dateLimite.setHours(23, 59, 59, 999));
 
-    // 1. Récupération des abonnements à relancer (< 7 jours)
     const expirations = await prisma.subscriptions.findMany({
-      where: {
-        end_date_subs: {
-          gte: debutAujourdhui,
-          lte: finJourneeLimite
-        }
-      },
+      where: { end_date_subs: { gte: debutAujourdhui, lte: finJourneeLimite } },
       include: { client: true, profile: { include: { account: true } } }
     });
 
-    // 2. NOUVEAU : Récupération des abonnements non renouvelés (Déjà terminés)
     const nonRenouveles = await prisma.subscriptions.findMany({
-      where: {
-        end_date_subs: {
-          lt: debutAujourdhui
-        },
-        status_subs: "ACTIVE" // Évite de récupérer les vieux abonnements déjà passés en EXPIRED
-      },
+      where: { end_date_subs: { lt: debutAujourdhui }, status_subs: "ACTIVE" },
       include: { client: true, profile: { include: { account: true } } }
     });
 
@@ -49,11 +37,23 @@ router.get('/subscriptions', async (req, res) => {
       return res.json({ message: "Aucun abonnement à signaler." });
     }
 
-    let texteTelegram = `🔥 *Nero-Erp - Alerte Abonnements* 🔥\n\n`;
-    
-    // -- BLOC 1 : Expirations proches --
+    // --- NOUVEAU SYSTÈME DE DÉCOUPAGE INTELLIGENT ---
+    let messagesToSend = [];
+    let currentChunk = `🔥 *Nero-Erp - Alerte Abonnements* 🔥\n\n`;
+
+    // Fonction qui ajoute un bloc de texte sans jamais le couper en deux
+    const addToChunk = (textBlock) => {
+      // Si le bloc actuel + le nouveau texte dépassent 3900 caractères
+      if (currentChunk.length + textBlock.length > 3900) {
+        messagesToSend.push(currentChunk); // On sauvegarde le message actuel
+        currentChunk = `*(Suite de l'alerte...)*\n\n` + textBlock; // On en commence un nouveau
+      } else {
+        currentChunk += textBlock;
+      }
+    };
+
     if (expirations.length > 0) {
-      texteTelegram += `⏳ *Abonnements à relancer (< 7 jours) :*\n\n`;
+      addToChunk(`⏳ *Abonnements à relancer (< 7 jours) :*\n\n`);
       expirations.forEach((sub, index) => {
         const nomClient = sub.client.name_clt;
         const nomPlateforme = sub.profile.account.platform_acct;
@@ -65,18 +65,20 @@ router.get('/subscriptions', async (req, res) => {
         const messageWhatsApp = `Bonjour ${nomClient} 👋,\n\nNous vous informons que votre abonnement ${nomPlateforme} arrive à expiration le *${dateFin}*.\n\nAfin de continuer à profiter de nos services de streaming, nous vous invitons à procéder à son renouvellement dans les plus brefs délais.\n\nCordialement.`;
         const lienWhatsApp = `https://wa.me/${cleanNumber}?text=${encodeURIComponent(messageWhatsApp)}`;
 
-        texteTelegram += `${index + 1}️⃣ *${nomClient}*\n`;
-        texteTelegram += `📺 Plateforme : _${nomPlateforme}_\n`;
-        texteTelegram += `📧 Email : ${emailCompte}\n`;
-        texteTelegram += `👤 Profil : ${nomProfil}\n`;
-        texteTelegram += `📅 Expiration : ${dateFin}\n`;
-        texteTelegram += `💬 Relancer : [Message WhatsApp](${lienWhatsApp})\n\n`;
+        // On construit le bloc du client, puis on l'ajoute proprement
+        let block = `${index + 1}️⃣ *${nomClient}*\n`;
+        block += `📺 Plateforme : _${nomPlateforme}_\n`;
+        block += `📧 Email : ${emailCompte}\n`;
+        block += `👤 Profil : ${nomProfil}\n`;
+        block += `📅 Expiration : ${dateFin}\n`;
+        block += `💬 Relancer : [Message WhatsApp](${lienWhatsApp})\n\n`;
+        
+        addToChunk(block);
       });
     }
 
-    // -- BLOC 2 : Non renouvelés --
     if (nonRenouveles.length > 0) {
-      texteTelegram += `❌ *NON RENOUVELÉS (Terminés) :*\n\n`;
+      addToChunk(`❌ *NON RENOUVELÉS (Terminés) :*\n\n`);
       nonRenouveles.forEach((sub, index) => {
         const nomClient = sub.client.name_clt;
         const nomPlateforme = sub.profile.account.platform_acct;
@@ -84,32 +86,26 @@ router.get('/subscriptions', async (req, res) => {
         const nomProfil = sub.profile.name_profil;
         const dateFin = new Date(sub.end_date_subs).toLocaleDateString('fr-FR');
 
-        texteTelegram += `🔴 *${nomClient}*\n`;
-        texteTelegram += `📺 Plateforme : _${nomPlateforme}_\n`;
-        texteTelegram += `📧 Email : ${emailCompte}\n`;
-        texteTelegram += `👤 Profil : ${nomProfil}\n`;
-        texteTelegram += `📅 Expiré depuis le : *${dateFin}*\n\n`;
+        let block = `🔴 *${nomClient}*\n`;
+        block += `📺 Plateforme : _${nomPlateforme}_\n`;
+        block += `📧 Email : ${emailCompte}\n`;
+        block += `👤 Profil : ${nomProfil}\n`;
+        block += `📅 Expiré depuis le : *${dateFin}*\n\n`;
+        
+        addToChunk(block);
       });
     }
 
-    texteTelegram += `⚡ _Ouvre ton Nero-Erp pour la gestion complète._`;
+    addToChunk(`⚡ _Ouvre ton Nero-Erp pour la gestion complète._`);
+    
+    // On n'oublie pas d'ajouter le dernier morceau !
+    messagesToSend.push(currentChunk);
 
     const token = process.env.TELEGRAM_BOT_TOKEN;
     const chatId = process.env.TELEGRAM_CHAT_ID;
     const url = `https://api.telegram.org/bot${token}/sendMessage`;
 
-    // 1. Découpage de sécurité si le message global dépasse 4000 caractères
-    const MAX_LENGTH = 4000;
-    let messagesToSend = [];
-    if (texteTelegram.length > MAX_LENGTH) {
-      for (let i = 0; i < texteTelegram.length; i += MAX_LENGTH) {
-        messagesToSend.push(texteTelegram.substring(i, i + MAX_LENGTH));
-      }
-    } else {
-      messagesToSend.push(texteTelegram);
-    }
-
-    // 2. Envoi des blocs avec gestion automatique des erreurs de syntaxe Markdown
+    // Boucle d'envoi Telegram
     for (const msg of messagesToSend) {
       const response = await fetch(url, {
         method: 'POST',
@@ -125,26 +121,15 @@ router.get('/subscriptions', async (req, res) => {
       const data = await response.json();
       
       if (!response.ok) {
-        console.error("❌ Erreur API Telegram détectée :", data);
+        console.error("❌ Erreur API Telegram :", data);
+        const isMarkdownError = data.description && (data.description.includes("parse") || data.description.includes("can't find end") || data.description.includes("character"));
         
-        // Si Telegram rejette le message à cause du Markdown (ex: un "_" mal placé dans un email ou un nom)
-        const isMarkdownError = data.description && (
-          data.description.includes("parse") || 
-          data.description.includes("can't find end") ||
-          data.description.includes("character")
-        );
-
+        // Ultime sécurité
         if (isMarkdownError) {
-          console.log("🔄 Réessai d'envoi immédiat en texte brut pour contourner le bug de formatage...");
           await fetch(url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              chat_id: chatId,
-              text: msg,
-              disable_web_page_preview: true
-              // On retire simplement 'parse_mode' pour envoyer le texte brut sans planter !
-            })
+            body: JSON.stringify({ chat_id: chatId, text: msg, disable_web_page_preview: true })
           });
         }
       }
@@ -157,6 +142,8 @@ router.get('/subscriptions', async (req, res) => {
     return res.status(500).json({ erreur: "Problème interne du serveur" });
   }
 });
+
+
 
 
 router.get('/accounts', async (req, res) => {

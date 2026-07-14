@@ -98,16 +98,57 @@ router.get('/subscriptions', async (req, res) => {
     const chatId = process.env.TELEGRAM_CHAT_ID;
     const url = `https://api.telegram.org/bot${token}/sendMessage`;
 
-    await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        chat_id: chatId,
-        text: texteTelegram,
-        parse_mode: 'Markdown',
-        disable_web_page_preview: true
-      })
-    });
+    // 1. Découpage de sécurité si le message global dépasse 4000 caractères
+    const MAX_LENGTH = 4000;
+    let messagesToSend = [];
+    if (texteTelegram.length > MAX_LENGTH) {
+      for (let i = 0; i < texteTelegram.length; i += MAX_LENGTH) {
+        messagesToSend.push(texteTelegram.substring(i, i + MAX_LENGTH));
+      }
+    } else {
+      messagesToSend.push(texteTelegram);
+    }
+
+    // 2. Envoi des blocs avec gestion automatique des erreurs de syntaxe Markdown
+    for (const msg of messagesToSend) {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          chat_id: chatId,
+          text: msg,
+          parse_mode: 'Markdown',
+          disable_web_page_preview: true
+        })
+      });
+
+      const data = await response.json();
+      
+      if (!response.ok) {
+        console.error("❌ Erreur API Telegram détectée :", data);
+        
+        // Si Telegram rejette le message à cause du Markdown (ex: un "_" mal placé dans un email ou un nom)
+        const isMarkdownError = data.description && (
+          data.description.includes("parse") || 
+          data.description.includes("can't find end") ||
+          data.description.includes("character")
+        );
+
+        if (isMarkdownError) {
+          console.log("🔄 Réessai d'envoi immédiat en texte brut pour contourner le bug de formatage...");
+          await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              chat_id: chatId,
+              text: msg,
+              disable_web_page_preview: true
+              // On retire simplement 'parse_mode' pour envoyer le texte brut sans planter !
+            })
+          });
+        }
+      }
+    }
 
     return res.json({ success: true, message: `Alerte envoyée (À relancer: ${expirations.length}, Expirés: ${nonRenouveles.length}) !` });
 

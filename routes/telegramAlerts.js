@@ -93,7 +93,7 @@ router.get('/subscriptions', async (req, res) => {
         block += `📧 Email : ${emailCompte}\n`;
         block += `👤 Profil : ${nomProfil}\n`;
         block += `📅 Expiré depuis le : *${dateFin}*\n`;
-        block += `💬 Message : (${waUrl})\n\n`;
+        block += `💬 Message : [Message WhatsApp]${waUrl}\n\n`;
         
         addToChunk(block);
       });

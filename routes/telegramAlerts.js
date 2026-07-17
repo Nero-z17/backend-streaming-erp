@@ -85,12 +85,15 @@ router.get('/subscriptions', async (req, res) => {
         const emailCompte = sub.profile.account.email_acct;
         const nomProfil = sub.profile.name_profil;
         const dateFin = new Date(sub.end_date_subs).toLocaleDateString('fr-FR');
+        const cleanNumber = sub.client.whatsapp_number_clt.replace(/\D/g, '');
+        const waUrl = `https://wa.me/${cleanNumber}`;
 
         let block = `🔴 *${nomClient}*\n`;
         block += `📺 Plateforme : _${nomPlateforme}_\n`;
         block += `📧 Email : ${emailCompte}\n`;
         block += `👤 Profil : ${nomProfil}\n`;
-        block += `📅 Expiré depuis le : *${dateFin}*\n\n`;
+        block += `📅 Expiré depuis le : *${dateFin}*\n`;
+        block += `💬 Message : (${waUrl})\n\n`;
         
         addToChunk(block);
       });
